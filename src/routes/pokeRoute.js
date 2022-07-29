@@ -1,22 +1,25 @@
 const { Router } = require("express");
 const { allInfo } = require("../controllers/pokeController.js");
+const { Op } = require("sequelize");
 const { Pokemon, Type } = require("../db");
 const router = Router();
 
 router.get("/pokemons", async (req, res) => {
   try {
     const { name } = req.query;
+    let full = Pokemon.findAll({include:{model: Type}})
     const info = await allInfo();
-    console.log("This is name", name);
+    if(!full.length) return await Pokemon.bulkCreate(info)
     if (name) {
-      const pokeName = info.filter((el) =>
-        el.name.toLowerCase().includes(name.toLowerCase())
-      );
+      const pokeName = await Pokemon.findAll({
+        where: { name: { [Op.iLike]: `%${name}%` } },
+      });
       pokeName
         ? res.status(200).json(pokeName)
         : res.status(404).json("NOT FOUND");
     } else {
-      res.status(200).json(info);
+      let full = await Pokemon.findAll({ include: { model: Type } });
+      res.status(200).json(full);
     }
   } catch (error) {
     res.status(500).send(error);
@@ -24,20 +27,17 @@ router.get("/pokemons", async (req, res) => {
   }
 });
 router.get("/pokemons/:id", async (req, res) => {
+  const { id } = req.params;
   try {
-    const { id } = req.params;
-    const info = await allInfo();
-    if (id > 40) {
-      const pokeInDB = await Pokemon.findOne({ where: { id }, include: Type });
-      !pokeInDB
-        ? res.status(404).send("Not valid ID")
-        : res.status(200).json(pokeInDB);
-    } else {
-      const pokeId = info.find((element) => `${element.id}` === id);
-      pokeId ? res.status(200).json(pokeId) : res.status(404).send("Not found");
+    if (id) {
+      const pokeById = await Pokemon.findByPk(id, {
+        include: { model: Type },
+      });
+      !pokeById
+        ? res.status(404).send("ID NOT FOUND")
+        : res.status(200).json(pokeById);
     }
   } catch (error) {
-    res.status(500).send(error);
     console.log(error);
   }
 });
